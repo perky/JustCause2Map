@@ -30,44 +30,53 @@ NetClient client;
 
 ControlP5 gui;
 Toggle server_toggle;
+Toggle trail_toggle;
+
 Textfield ipField;
 Textfield nameField;
 Textfield portField;
 Button connectButton;
 
+PGraphics trailCanvas;
+
 void setup() {
-  size( 468, 468 );
+  size( 1024, 768 );
   frameRate(30);
   currentTime = millis();
   timer = 0;
   map_image = loadImage("jc2map.bmp");
   find_process_by_name( "JustCause2.exe" );
-  
+
   Player.setup( this );
   client = new NetClient( this );
   server = new NetServer( this );
-  
+
   gui = new ControlP5(this);
-  server_toggle = gui.addToggle("server_toggle",true,10,10,100,20);
+  server_toggle = gui.addToggle("server_toggle", true, 10, 10, 100, 20);
   server_toggle.setMode(gui.SWITCH);
   server_toggle.setLabel("client / server");
+  trail_toggle = gui.addToggle("trails", false, 10, 45, 40, 20);
   ipField = gui.addTextfield("ipField", 115, 10, 200, 20);
   ipField.setFocus(true);
   ipField.setLabel("IP Address");
   ipField.setText("127.0.0.1");
-  portField = gui.addTextfield("Port",115, 45, 200, 20);
+  portField = gui.addTextfield("Port", 115, 45, 200, 20);
   portField.setText("5204");
-  nameField = gui.addTextfield("Name",115, 80, 200, 20);
+  nameField = gui.addTextfield("Name", 115, 80, 200, 20);
   nameField.setText("Someguy");
-  
+
   connectButton = gui.addButton("connectButton", 0, 325, 10, 100, 20);
   connectButton.setLabel("Connect");
-  
+
+  trailCanvas = createGraphics(2048, 2048, P2D);
+
   addMouseWheelListener(new java.awt.event.MouseWheelListener() { 
     public void mouseWheelMoved(java.awt.event.MouseWheelEvent evt) { 
       mouseWheel(evt.getWheelRotation());
-  }}); 
-  
+    }
+  }
+  ); 
+
   local_player = new Player("127.0.0.1", -1);
 }
 
@@ -91,17 +100,17 @@ void update( int dt ) {
     timer = 0;
     last_x = x_pos;
     last_y = y_pos;
-    next_x = getXPos();
-    next_y = getYPos();
-    //next_x = random(width);
-    //next_y = random(height);
-    
+    //next_x = getXPos();
+    //next_y = getYPos();
+    next_x = random(width);
+    next_y = random(height);
+
     sendPosition( next_x, next_y );
-    if (local_player != null && isServer){
+    if (local_player != null && isServer) {
       local_player.setPosition( int(next_x), int(next_y) );
     }
   }
-  
+
   server.update(dt);
   client.update(dt);
   update_players(dt);
@@ -109,15 +118,30 @@ void update( int dt ) {
 
 void draw() {
   update_dt();
+  if ( trail_toggle.getState() ) {
+    draw_trails();
+  }
+
   background( 0 );
-  
   pushMatrix();
   translate(width/2 + scaleXY*translateX, height/2 + scaleXY*translateY);
   scale(scaleXY);
-    imageMode(CENTER);
-    image( map_image, 0, 0 );
-    draw_players();
-   popMatrix();
+  imageMode(CENTER);
+  image( map_image, 0, 0 );
+  
+  if ( trail_toggle.getState() ) {
+    imageMode(CORNER);
+    image( trailCanvas, 0, 0 );
+  }
+  
+  draw_players();
+  popMatrix();
+}
+
+void draw_trails() {
+  trailCanvas.beginDraw();
+  draw_players_trails( trailCanvas );
+  trailCanvas.endDraw();
 }
 
 void mouseDragged() {
@@ -128,8 +152,12 @@ void mouseDragged() {
 }
 
 void mouseWheel(int delta) {
-  if (delta == -1) { scaleXY *= 1.25; }
-  else if ((delta == 1) && (scaleXY > 0.5)) { scaleXY *= 1/1.25; }
+  if (delta == -1) { 
+    scaleXY *= 1.25;
+  }
+  else if ((delta == 1) && (scaleXY > 0.5)) { 
+    scaleXY *= 1/1.25;
+  }
 }
 
 void find_process_by_name( String process_name )
@@ -138,16 +166,16 @@ void find_process_by_name( String process_name )
     // Execute command
     String line;
     Process p = Runtime.getRuntime().exec
-        (System.getenv("windir") +"\\system32\\"+"tasklist.exe");
+      (System.getenv("windir") +"\\system32\\"+"tasklist.exe");
     BufferedReader input =
       new BufferedReader(new InputStreamReader(p.getInputStream()));
     while ( (line = input.readLine ()) != null) {
       String[] m = match( line, process_name + "\\s+([0-9]+)" );
       if (m != null ) {
-         System.out.println( m[1] );
-         PID = int(m[1]);
-         setup_processmem();
-         break;
+        System.out.println( m[1] );
+        PID = int(m[1]);
+        setup_processmem();
+        break;
       }
     }
     input.close();
@@ -173,7 +201,7 @@ void setup_processmem()
   boolean success = lib.ReadProcessMemory(PROCESS, offset, outputBuffer, bufferSize, null);
   System.out.println("success = " + success);
   byte[] bufferBytes = outputBuffer.getByteArray(0, bufferSize);
-  
+
   last_x = getXPos();
   last_y = getYPos();
   next_x = last_x;
@@ -224,7 +252,7 @@ public static float getZPos() {
 }
 
 void server_toggle(boolean theFlag) {
-  if(theFlag==true){
+  if (theFlag==true) {
     connectButton.setVisible( true );
     ipField.setVisible( true );
     nameField.setVisible( true );
@@ -232,7 +260,8 @@ void server_toggle(boolean theFlag) {
     server.stop();
     client.stop();
     isServer = false;
-  } else {
+  } 
+  else {
     connectButton.setVisible( false );
     ipField.setVisible( false );
     nameField.setVisible( false );
@@ -250,3 +279,4 @@ public void connectButton(int theValue) {
     connect();
   }
 }
+

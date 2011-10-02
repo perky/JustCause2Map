@@ -3,6 +3,7 @@ class NetClient {
   PApplet p5;
   public boolean isOn;
   int timer;
+  int ping_interval = 10000;
   String name;
 
   NetClient(PApplet p5) {
@@ -32,6 +33,12 @@ class NetClient {
   void update(int dt) {
     if (!isOn) { 
       return;
+    }
+    
+    timer += dt;
+    if (timer > ping_interval && local_player != null){
+      timer = 0;
+      send_message( MSG_PING + "," + local_player.id );
     }
 
     String stringIn;
@@ -93,6 +100,10 @@ class NetClient {
   }
 
   void clientDisconnected(String[] data) {
+    int index = int(data[1]);
+    if (Player.doesExist(index)) {
+      Player.instances.remove(index);
+    }
   }
 }
 

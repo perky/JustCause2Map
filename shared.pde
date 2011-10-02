@@ -6,6 +6,7 @@ public static final int MSG_CLIENT_DISCONNECT  = 1;
 public static final int MSG_POSITION_UPDATE    = 2;
 public static final int MSG_NAME_UPDATE        = 3;
 public static final int MSG_HANDSHAKE          = 4;
+public static final int MSG_PING               = 5;
 public static final char MSG_END = '*';
 
 public static Player local_player;
@@ -66,6 +67,13 @@ void draw_players() {
   for (int i : Player.instances.keySet()) {
     Player player = Player.instances.get(i);
     player.draw();
+  }
+}
+
+void draw_players_trails(PGraphics canvas) {
+  for (int i : Player.instances.keySet()) {
+    Player player = Player.instances.get(i);
+    player.draw_trails(canvas);
   }
 }
 

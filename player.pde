@@ -88,6 +88,11 @@ public static class Player {
     parent.text( name, x_pos, y_pos-5 );
   }
   
+  void draw_trails(PGraphics canvas){
+    canvas.fill( 255, 50, 50 );
+    canvas.ellipse( x_pos, y_pos, 2, 2 );
+  }
+  
   void setPosition(int x, int y) {
     time_diff = parent.millis() - last_update_time;
     last_update_time = parent.millis();
