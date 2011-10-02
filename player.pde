@@ -89,8 +89,8 @@ public static class Player {
   }
   
   void draw_trails(PGraphics canvas){
-    canvas.fill( 255, 50, 50 );
-    canvas.ellipse( x_pos, y_pos, 2, 2 );
+    canvas.fill( 255, 150, 150 );
+    canvas.ellipse( x_pos+1024, y_pos+1024, 3, 3 );
   }
   
   void setPosition(int x, int y) {

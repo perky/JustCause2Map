@@ -40,7 +40,7 @@ Button connectButton;
 PGraphics trailCanvas;
 
 void setup() {
-  size( 1024, 768 );
+  size( 768, 768 );
   frameRate(30);
   currentTime = millis();
   timer = 0;
@@ -100,10 +100,10 @@ void update( int dt ) {
     timer = 0;
     last_x = x_pos;
     last_y = y_pos;
-    //next_x = getXPos();
-    //next_y = getYPos();
-    next_x = random(width);
-    next_y = random(height);
+    next_x = getXPos();
+    next_y = getYPos();
+    //next_x = random(-1024,1024);
+    //next_y = random(-1024,1024);
 
     sendPosition( next_x, next_y );
     if (local_player != null && isServer) {
@@ -131,7 +131,7 @@ void draw() {
   
   if ( trail_toggle.getState() ) {
     imageMode(CORNER);
-    image( trailCanvas, 0, 0 );
+    image( trailCanvas, -1024, -1024 );
   }
   
   draw_players();
@@ -238,12 +238,12 @@ private static float readJC2Address( int offset ) {
 
 public static float getXPos() {
   float x = readJC2Address( (int)0x011FA2E4 );
-  return (x + 16384) / 16;
+  return (x) / (32768/2048);
 }
 
 public static float getYPos() {
   float y = readJC2Address( (int)0x011FA2EC );
-  return (y + 16384) / 16;
+  return (y) / (32768/2048);
 }
 
 public static float getZPos() {
