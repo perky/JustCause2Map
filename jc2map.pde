@@ -32,6 +32,7 @@ ControlP5 gui;
 Toggle server_toggle;
 Textfield ipField;
 Textfield nameField;
+Textfield portField;
 Button connectButton;
 
 void setup() {
@@ -54,7 +55,9 @@ void setup() {
   ipField.setFocus(true);
   ipField.setLabel("IP Address");
   ipField.setText("127.0.0.1");
-  nameField = gui.addTextfield("Name",115, 45, 200, 20);
+  portField = gui.addTextfield("Port",115, 45, 200, 20);
+  portField.setText("5204");
+  nameField = gui.addTextfield("Name",115, 80, 200, 20);
   nameField.setText("Someguy");
   
   connectButton = gui.addButton("connectButton", 0, 325, 10, 100, 20);
@@ -225,6 +228,7 @@ void server_toggle(boolean theFlag) {
     connectButton.setVisible( true );
     ipField.setVisible( true );
     nameField.setVisible( true );
+    portField.setVisible( true );
     server.stop();
     client.stop();
     isServer = false;
@@ -232,6 +236,7 @@ void server_toggle(boolean theFlag) {
     connectButton.setVisible( false );
     ipField.setVisible( false );
     nameField.setVisible( false );
+    portField.setVisible( false );
     isServer = true;
     client.stop();
     server.start();

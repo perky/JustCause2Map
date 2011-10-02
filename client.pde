@@ -11,7 +11,8 @@ class NetClient {
 
   void start(String ip, String name) {
     if (isOn){return;}
-    client = new Client(p5, ip, 5204);
+    int port = int(portField.getText());
+    client = new Client(p5, ip, port);
     isOn = true;
     this.name = name;
     isConnected = true;
@@ -74,6 +75,7 @@ class NetClient {
     connectButton.setVisible( false );
     ipField.setVisible( false );
     nameField.setVisible( false );
+    portField.setVisible( false );
   }
 
   void clientConnected(String[] data) {

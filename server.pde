@@ -12,7 +12,8 @@ class NetServer
   }
 
   void start() {
-    this.server = new Server(p5, 5204);
+    int port = int(portField.getText());
+    this.server = new Server(p5, port);
     isOn = true;
     println("server started");
   }
