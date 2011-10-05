@@ -36,10 +36,10 @@ void send_message(String data) {
   }
 }
 
-void sendPosition(Float x_pos, Float y_pos) {
+void sendPosition(PVector pos) {
   if (local_player != null) {
-    int x = int(x_pos);
-    int y = int(y_pos);
+    int x = int(pos.x);
+    int y = int(pos.y);
     String data = MSG_POSITION_UPDATE + "," + local_player.id + "," + x + "," + y;
     send_message( data );
   }

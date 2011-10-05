@@ -1,5 +1,5 @@
 public static class Player {
-  
+  PVector pos, last_pos, current_pos;
   float x_pos;
   float y_pos;
   float last_x;
@@ -25,6 +25,7 @@ public static class Player {
   
   public Player(String anIP, int anID){
     ip = anIP;
+    current_pos = new PVector(0,0);
     if (anID == -1) {
       id = numberOfPlayers++;
       instances.put( id, this );
@@ -73,33 +74,48 @@ public static class Player {
   void update(int dt){
     timer += dt;
     if (timer < time_diff) {
-      x_pos = lerp(last_x, next_x, timer / time_diff);
-      y_pos = lerp(last_y, next_y, timer / time_diff);
+      current_pos = vectorLerp( last_pos, pos, timer / time_diff );
     } else if (timer >= time_diff) {
       timer = 0;
-      last_x = next_x;
-      last_y = next_y;
+      if (pos != null)
+        last_pos = pos.get();
     }
   }
   
   void draw() {
     parent.fill( 255, 0, 0 );
-    parent.ellipse( x_pos, y_pos, 5, 5 );
-    parent.text( name, x_pos, y_pos-5 );
+    parent.ellipse( current_pos.x, current_pos.y, 5, 5 );
+    parent.text( name, current_pos.x, current_pos.y-5 );
   }
   
   void draw_trails(PGraphics canvas){
-    canvas.fill( 255, 150, 150 );
-    canvas.ellipse( x_pos+1024, y_pos+1024, 3, 3 );
+    canvas.noStroke();
+    canvas.fill( 255, 0, 0, 10 );
+    canvas.ellipse( current_pos.x+1024, current_pos.y+1024, 4,4 );
   }
   
   void setPosition(int x, int y) {
     time_diff = parent.millis() - last_update_time;
     last_update_time = parent.millis();
     timer = 0;
-    last_x = x_pos;
-    last_y = y_pos;
-    next_x = x;
-    next_y = y;
+    
+    if (pos == null) {
+      pos = new PVector( float(x), float(y) );
+      last_pos = pos.get();
+    } else {
+      last_pos = pos.get();
+      pos = new PVector( float(x), float(y) );
+    }
+  }
+  
+  void setPositionInstant(PVector posVec) {
+    current_pos = posVec.get();
+  }
+  
+  PVector vectorLerp( PVector vec1, PVector vec2, float amount ) {
+    float x = lerp( vec1.x, vec2.x, amount );
+    float y = lerp( vec1.y, vec2.y, amount );
+    float z = lerp( vec1.z, vec2.z, amount );
+    return new PVector( x, y, z );
   }
 }

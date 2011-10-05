@@ -5,22 +5,29 @@ import com.sun.jna.ptr.*;
 import com.sun.jna.*;
 import java.io.*;
 import java.util.*;
+import java.lang.Exception;
 
+public static CUser32 User32 = CUser32.INSTANCE;
+public static CKernel32 Kernel32 = CKernel32.INSTANCE;
+public static int PROCESS_TERMINATE = 1;
 public static final int PROCESS_QUERY_INFORMATION = 0x0400;
 public static final int PROCESS_VM_READ = 0x0010;
-public static Pointer PROCESS;
+public static int ACCESS_FLAGS = 0x0439;
+public static int hProcess;
+public static int waypoint_ingame_x_addr = 0x11214174;
+public static int waypoint_ingame_y_addr = 0x1121417C;
+public static int waypoint_ingame_z_addr = 0x11214178;
 public static int PID;
+
+PVector pos, last_pos, rawPos, last_rawPos;
 
 PImage map_image;
 int currentTime;
 float timer;
-float x_pos = 0;
-float y_pos = 0;
-float next_x = 0;
-float next_y = 0;
-float last_x = 0;
-float last_y = 0;
+
 int update_interval = 500;
+int waypoint_update_interval = 100;
+int waypoint_timer;
 float scaleXY = 1;
 int translateX = 0;
 int translateY = 0;
@@ -40,12 +47,17 @@ Button connectButton;
 PGraphics trailCanvas;
 
 void setup() {
-  size( 768, 768 );
+  size( 568, 568 );
   frameRate(30);
   currentTime = millis();
   timer = 0;
   map_image = loadImage("jc2map.bmp");
-  find_process_by_name( "JustCause2.exe" );
+
+  setup_processmem();
+  rawPos = getPlayerPosition();
+  last_rawPos = rawPos.get();
+  pos = translatedPlayerPosition( rawPos );
+  last_pos = pos.get();
 
   Player.setup( this );
   client = new NetClient( this );
@@ -78,6 +90,7 @@ void setup() {
   ); 
 
   local_player = new Player("127.0.0.1", -1);
+  waypoint_timer = millis() + waypoint_update_interval;
 }
 
 void stop() {
@@ -94,21 +107,25 @@ void update_dt() {
 
 void update( int dt ) {
   timer += dt;
-  x_pos = lerp( last_x, next_x, timer / update_interval );
-  y_pos = lerp( last_y, next_y, timer / update_interval );
+  
+  // Interpolate between last position and current position.
+  PVector current_pos = vectorLerp( last_pos, pos, timer / update_interval );
+  
+  if (local_player != null) {
+    local_player.setPositionInstant( current_pos );
+  }
+
   if (timer >= update_interval) {
     timer = 0;
-    last_x = x_pos;
-    last_y = y_pos;
-    next_x = getXPos();
-    next_y = getYPos();
-    //next_x = random(-1024,1024);
-    //next_y = random(-1024,1024);
 
-    sendPosition( next_x, next_y );
-    if (local_player != null && isServer) {
-      local_player.setPosition( int(next_x), int(next_y) );
-    }
+    // Read position from memory.
+    last_pos = pos.get();
+    last_rawPos = rawPos.get();
+    rawPos = getPlayerPosition();
+    pos = translatedPlayerPosition( rawPos );
+
+    // Netword position.
+    sendPosition( pos );
   }
 
   server.update(dt);
@@ -128,12 +145,12 @@ void draw() {
   scale(scaleXY);
   imageMode(CENTER);
   image( map_image, 0, 0 );
-  
+
   if ( trail_toggle.getState() ) {
     imageMode(CORNER);
     image( trailCanvas, -1024, -1024 );
   }
-  
+
   draw_players();
   popMatrix();
 }
@@ -151,6 +168,15 @@ void mouseDragged() {
   }
 }
 
+void mousePressed() {
+  if (mouseButton == RIGHT) {
+    float x = float( (mouseX - translateX) - (width/2) ) * (32768/2048);
+    float y = float( (mouseY - translateY) - (height/2) ) * (32768/2048);
+    float z = 400;
+    writeWaypointPos( x, y, z );
+  }
+}
+
 void mouseWheel(int delta) {
   if (delta == -1) { 
     scaleXY *= 1.25;
@@ -160,59 +186,31 @@ void mouseWheel(int delta) {
   }
 }
 
-void find_process_by_name( String process_name )
-{
-  try {
-    // Execute command
-    String line;
-    Process p = Runtime.getRuntime().exec
-      (System.getenv("windir") +"\\system32\\"+"tasklist.exe");
-    BufferedReader input =
-      new BufferedReader(new InputStreamReader(p.getInputStream()));
-    while ( (line = input.readLine ()) != null) {
-      String[] m = match( line, process_name + "\\s+([0-9]+)" );
-      if (m != null ) {
-        System.out.println( m[1] );
-        PID = int(m[1]);
-        setup_processmem();
-        break;
-      }
-    }
-    input.close();
-  } 
-  catch(IOException e) {
-    e.printStackTrace();
-  }
+void setup_processmem() {
+  int[] dwProcessId = new int[1];
+  int hWnd = User32.FindWindowA(null, "Just Cause 2");
+  User32.GetWindowThreadProcessId(hWnd, dwProcessId);
+  hProcess = Kernel32.OpenProcess(ACCESS_FLAGS, 0, dwProcessId[0]);
 }
 
-void setup_processmem() 
-{
-  Kernel32 lib = Kernel32.INSTANCE;
-  int bufferSize = 8;
-  int offset = 0x011FA2EC;
-  PROCESS = lib.OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, false, PID);
-  if (PROCESS == null) {
-    throw new RuntimeException("no such pid: " + PID);
-  }
+public interface CUser32 extends Library {
+  CUser32 INSTANCE = (CUser32)
+    Native.loadLibrary((Platform.isWindows() ? "user32" : null), 
+    CUser32.class);
 
-  IntByReference baseAddress = new IntByReference( offset );
-  Memory outputBuffer = new Memory(bufferSize);
-
-  boolean success = lib.ReadProcessMemory(PROCESS, offset, outputBuffer, bufferSize, null);
-  System.out.println("success = " + success);
-  byte[] bufferBytes = outputBuffer.getByteArray(0, bufferSize);
-
-  last_x = getXPos();
-  last_y = getYPos();
-  next_x = last_x;
-  next_y = last_y;
+  int FindWindowA(String ClassName, String WindowName);
+  int GetWindowThreadProcessId(int hWnd, int[] lpdwProcessId);
 }
 
-private interface Kernel32 extends StdCallLibrary
-{
-  Kernel32 INSTANCE = (Kernel32) Native.loadLibrary("kernel32", Kernel32.class);
-  public Pointer OpenProcess(int dwDesiredAccess, boolean bInheritHandle, int dwProcessId);
-  boolean ReadProcessMemory(Pointer hProcess, int inBaseAddress, 
+public interface CKernel32 extends Library {
+  CKernel32 INSTANCE = (CKernel32)
+    Native.loadLibrary((Platform.isWindows() ? "kernel32" : null), 
+    CKernel32.class);
+
+  int OpenProcess(int dwDesiredAccess, int bInheritHandle, int dwProcessId);
+  int TerminateProcess(int hProcess, int uExitCode);
+  int WriteProcessMemory(int hProcess, int lpBaseAddress, int[] lpBuffer, int nSize, int[] lpNumberOfBytesWritten);
+  boolean ReadProcessMemory(int hProcess, int inBaseAddress, 
   Pointer outputBuffer, int nSize, IntByReference outNumberOfBytesRead);
 }
 
@@ -227,28 +225,51 @@ private static float byteArrayToFloat(byte test[]) {
   return Float.intBitsToFloat(bits);
 }
 
-private static float readJC2Address( int offset ) {
+private static float readJC2Address( int address ) {
   int bufferSize = 8;
-  Kernel32 lib = Kernel32.INSTANCE;
   Memory outputBuffer = new Memory(bufferSize);
-  boolean success = lib.ReadProcessMemory(PROCESS, offset, outputBuffer, bufferSize, null);
+  boolean success = Kernel32.ReadProcessMemory(hProcess, address, outputBuffer, bufferSize, null);
   byte[] bufferBytes = outputBuffer.getByteArray(0, bufferSize);
   return byteArrayToFloat(bufferBytes);
 }
 
-public static float getXPos() {
+private static void writeJC2Address( int address, int[] value ) {
+  Kernel32.WriteProcessMemory(hProcess, address, value, 4, null);
+}
+
+public static void writeWaypointPos( float x, float y, float z ) {
+  try {
+    int[] ix = {
+      BitConverter.toInt32( BitConverter.getBytes( x ), 0 )
+    };
+    int[] iy = {
+      BitConverter.toInt32( BitConverter.getBytes( y ), 0 )
+    };
+    int[] iz = {
+      BitConverter.toInt32( BitConverter.getBytes( z ), 0 )
+    };
+    Kernel32.WriteProcessMemory(hProcess, waypoint_ingame_y_addr, iy, 4, null);
+    Kernel32.WriteProcessMemory(hProcess, waypoint_ingame_x_addr, ix, 4, null);
+    Kernel32.WriteProcessMemory(hProcess, waypoint_ingame_z_addr, iz, 4, null);
+  } 
+  catch (Exception e) {
+    println("nope");
+  }
+}
+
+PVector getPlayerPosition() {
   float x = readJC2Address( (int)0x011FA2E4 );
-  return (x) / (32768/2048);
-}
-
-public static float getYPos() {
   float y = readJC2Address( (int)0x011FA2EC );
-  return (y) / (32768/2048);
+  float z = readJC2Address( (int)0x011FA2E8 );
+  return new PVector( x, y, z );
 }
 
-public static float getZPos() {
-  float z = readJC2Address( (int)0x011FA2E8 );
-  return z - 200;
+PVector translatedPlayerPosition( PVector vec ) {
+  float ratio = 32768 / 2048;
+  float x = vec.x / ratio;
+  float y = vec.y / ratio;
+  float z = vec.z - 200;
+  return new PVector( x, y, z );
 }
 
 void server_toggle(boolean theFlag) {
@@ -273,10 +294,16 @@ void server_toggle(boolean theFlag) {
   }
 }
 
-
 public void connectButton(int theValue) { 
   if (!isServer) { 
     connect();
   }
+}
+
+PVector vectorLerp( PVector vec1, PVector vec2, float amount ) {
+  float x = lerp( vec1.x, vec2.x, amount );
+  float y = lerp( vec1.y, vec2.y, amount );
+  float z = lerp( vec1.z, vec2.z, amount );
+  return new PVector( x, y, z );
 }
 
